@@ -335,6 +335,69 @@ impl Buffer {
     pub fn channel_iter_mut<T>(&mut self, chan: &Channel) -> IterMut<'_, T> {
         IterMut::new(self, chan)
     }
+
+    /// Gets a pointer to the first sample for a channel.
+    pub fn first_for_channel<T>(&self, chan: &Channel) -> *const T {
+        unsafe { ffi::iio_buffer_first(self.buf, chan.chan).cast() }
+    }
+
+    /// Gets a mutable pointer to the first sample for a channel.
+    pub fn first_for_channel_mut<T>(&mut self, chan: &Channel) -> *mut T {
+        unsafe { ffi::iio_buffer_first(self.buf, chan.chan).cast() }
+    }
+
+    /// Gets a pointer to the start of the buffer.
+    pub fn start<T>(&self) -> *const T {
+        unsafe { ffi::iio_buffer_start(self.buf).cast() }
+    }
+
+    /// Gets a mutable pointer to the start of the buffer.
+    pub fn start_mut<T>(&mut self) -> *mut T {
+        unsafe { ffi::iio_buffer_start(self.buf).cast() }
+    }
+
+    /// Gets a pointer to the end of the buffer.
+    pub fn end<T>(&self) -> *const T {
+        unsafe { ffi::iio_buffer_end(self.buf).cast() }
+    }
+
+    /// Gets a mutable pointer to the end of the buffer.
+    pub fn end_mut<T>(&mut self) -> *mut T {
+        unsafe { ffi::iio_buffer_end(self.buf).cast() }
+    }
+
+    /// Gets a slice of the buffer.
+    pub fn as_slice<T>(&self) -> &[T] {
+        unsafe {
+            let start = self.start::<T>();
+            let end = self.end::<T>();
+            slice::from_raw_parts(start, end.offset_from(start) as usize)
+        }
+    }
+
+    /// Gets a mutable slice of the buffer.
+    pub fn as_mut_slice<T>(&mut self) -> &mut [T] {
+        unsafe {
+            let start = self.start_mut::<T>();
+            let end = self.end_mut::<T>();
+            slice::from_raw_parts_mut(start, end.offset_from(start) as usize)
+        }
+    }
+
+    /// Gets a pointer to the start of the buffer.
+    pub fn as_ptr<T>(&self) -> *const T {
+        self.start::<T>()
+    }
+
+    /// Gets a mutable pointer to the start of the buffer.
+    pub fn as_ptr_mut<T>(&mut self) -> *mut T {
+        self.start_mut::<T>()
+    }
+
+    /// Gets the step size in number of samples for a channel.
+    pub fn step<T>(&self) -> isize {
+        unsafe { ffi::iio_buffer_step(self.buf) / size_of::<T>() as isize }
+    }
 }
 
 /// Destroy the underlying buffer when the object scope ends.
@@ -382,8 +445,7 @@ impl<'a, T: 'a> Iterator for Iter<'a, T> {
         unsafe {
             if self.ptr.cast() >= self.end {
                 None
-            }
-            else {
+            } else {
                 let prev = self.ptr;
                 self.ptr = self.ptr.offset(self.step);
                 Some(&*prev)
@@ -430,8 +492,7 @@ impl<'a, T: 'a> Iterator for IterMut<'a, T> {
     fn next(&mut self) -> Option<Self::Item> {
         if self.ptr as *const T >= self.end {
             None
-        }
-        else {
+        } else {
             unsafe {
                 let prev = self.ptr;
                 self.ptr = self.ptr.offset(self.step);
